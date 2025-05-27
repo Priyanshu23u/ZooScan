@@ -1,20 +1,381 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Animal Classifier</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Image Classifier</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      padding: 40px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      transition: transform 0.3s ease;
+    }
+
+    .container:hover {
+      transform: translateY(-5px);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #6b7280;
+      font-size: 1.1rem;
+      margin-bottom: 30px;
+      font-weight: 400;
+    }
+
+    .upload-area {
+      border: 3px dashed #d1d5db;
+      border-radius: 16px;
+      padding: 40px 20px;
+      margin: 25px 0;
+      background: #fafafa;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .upload-area:hover {
+      border-color: #667eea;
+      background: #f8faff;
+      transform: scale(1.02);
+    }
+
+    .upload-area.dragover {
+      border-color: #667eea;
+      background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+    }
+
+    .upload-icon {
+      font-size: 3rem;
+      color: #9ca3af;
+      margin-bottom: 15px;
+      transition: all 0.3s ease;
+    }
+
+    .upload-area:hover .upload-icon {
+      color: #667eea;
+      transform: scale(1.1);
+    }
+
+    .upload-text {
+      color: #6b7280;
+      font-size: 1.1rem;
+      font-weight: 500;
+    }
+
+    .upload-subtext {
+      color: #9ca3af;
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .predict-btn {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      padding: 15px 40px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+      margin: 20px 0;
+      opacity: 0.6;
+      pointer-events: none;
+    }
+
+    .predict-btn:enabled {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .predict-btn:enabled:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4);
+    }
+
+    .predict-btn:active {
+      transform: translateY(0);
+    }
+
+    .predict-btn.loading {
+      position: relative;
+      color: transparent;
+    }
+
+    .predict-btn.loading::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 20px;
+      border: 2px solid transparent;
+      border-top: 2px solid white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    .result {
+      margin-top: 30px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.5s ease;
+    }
+
+    .result.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .prediction {
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: white;
+      padding: 20px;
+      border-radius: 16px;
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 25px rgba(16, 185, 129, 0.3);
+    }
+
+    .prediction-label {
+      font-size: 0.9rem;
+      opacity: 0.9;
+      margin-bottom: 5px;
+    }
+
+    .preview-container {
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+      display: inline-block;
+      background: white;
+      padding: 8px;
+    }
+
+    #preview {
+      max-width: 100%;
+      max-height: 300px;
+      border-radius: 12px;
+      transition: transform 0.3s ease;
+    }
+
+    #preview:hover {
+      transform: scale(1.02);
+    }
+
+    .error {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      color: white;
+      padding: 15px;
+      border-radius: 12px;
+      margin-top: 20px;
+      font-weight: 500;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        margin: 10px;
+        padding: 30px 20px;
+      }
+      
+      h1 {
+        font-size: 2rem;
+      }
+      
+      .upload-area {
+        padding: 30px 15px;
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.6s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Animal Image Classifier</h1>
-        <form method="POST" enctype="multipart/form-data">
-            <input type="file" name="image" accept="image/*" required>
-            <button type="submit">Classify</button>
-        </form>
-        {% if prediction %}
-        <div class="result">{{ prediction }}</div>
-        {% endif %}
+  <div class="container fade-in">
+    <h1>🤖 AI Vision</h1>
+    <p class="subtitle">Upload an image and let AI identify what it sees</p>
+    
+    <div class="upload-area" onclick="document.getElementById('imageInput').click()">
+      <div class="upload-icon">📸</div>
+      <div class="upload-text">Click to upload an image</div>
+      <div class="upload-subtext">or drag and drop your file here</div>
     </div>
+    
+    <input type="file" id="imageInput" accept="image/*" />
+    <button class="predict-btn" id="predictBtn" onclick="uploadImage()" disabled>
+      Classify Image
+    </button>
+    
+    <div id="result" class="result"></div>
+  </div>
+
+  <script>
+    let selectedFile = null;
+    
+    const imageInput = document.getElementById('imageInput');
+    const predictBtn = document.getElementById('predictBtn');
+    const uploadArea = document.querySelector('.upload-area');
+    const resultDiv = document.getElementById('result');
+
+    // File input change handler
+    imageInput.addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        selectedFile = file;
+        showFileSelected(file);
+        predictBtn.disabled = false;
+      }
+    });
+
+    // Drag and drop functionality
+    uploadArea.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', function(e) {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      
+      const files = e.dataTransfer.files;
+      if (files.length > 0 && files[0].type.startsWith('image/')) {
+        selectedFile = files[0];
+        showFileSelected(files[0]);
+        predictBtn.disabled = false;
+      }
+    });
+
+    function showFileSelected(file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        uploadArea.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: center; gap: 15px;">
+            <img src="${e.target.result}" style="width: 60px; height: 60px; object-fit: cover; border-radius: 8px;">
+            <div>
+              <div style="font-weight: 600; color: #374151;">${file.name}</div>
+              <div style="font-size: 0.8rem; color: #9ca3af;">Ready to classify</div>
+            </div>
+          </div>
+        `;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function uploadImage() {
+      if (!selectedFile) return;
+
+      // Show loading state
+      predictBtn.classList.add('loading');
+      predictBtn.disabled = true;
+      resultDiv.classList.remove('show');
+      
+      const formData = new FormData();
+      formData.append('image', selectedFile);
+
+      fetch('/predict', {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(data => {
+        // Hide loading state
+        predictBtn.classList.remove('loading');
+        predictBtn.disabled = false;
+        
+        // Show result
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          resultDiv.innerHTML = `
+            <div class="prediction">
+              <div class="prediction-label">Classification Result</div>
+              <div>${data.prediction}</div>
+            </div>
+            <div class="preview-container">
+              <img id="preview" src="${e.target.result}" alt="Uploaded image" />
+            </div>
+          `;
+          resultDiv.classList.add('show');
+        };
+        reader.readAsDataURL(selectedFile);
+      })
+      .catch(err => {
+        console.error('Error:', err);
+        
+        // Hide loading state
+        predictBtn.classList.remove('loading');
+        predictBtn.disabled = false;
+        
+        // Show error
+        resultDiv.innerHTML = `
+          <div class="error">
+            ❌ Error: Could not classify image. Please try again.
+          </div>
+        `;
+        resultDiv.classList.add('show');
+      });
+    }
+  </script>
 </body>
 </html>

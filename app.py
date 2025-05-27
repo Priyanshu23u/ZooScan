@@ -1,51 +1,44 @@
-from flask import Flask, render_template, request
-from tensorflow.keras.applications import VGG16
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dense
-from tensorflow.keras.preprocessing.image import img_to_array
-from tensorflow.keras.applications.vgg16 import preprocess_input
+from flask import Flask, render_template, request, jsonify
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
 import numpy as np
-from PIL import Image
 import os
-from tensorflow.keras import Input
 
 app = Flask(__name__)
+model = load_model('model.h5')  # Your VGG16 model
 
-# === Rebuild model architecture ===
-base_model = VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+# Ensure uploads folder exists
+UPLOAD_FOLDER = 'static/uploads'
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# 2. Add custom head exactly like you used during training
-x = base_model.output
-x = GlobalAveragePooling2D()(x)
-x = Dense(256, activation='relu', name='dense')(x)
-predictions = Dense(3, activation='softmax', name='dense_1')(x)
+# Image size must match model input
+IMG_SIZE = (224, 224)
 
-# 3. Rebuild the full model
-model = Model(inputs=base_model.input, outputs=predictions)
+# Modify these labels to match your model's output
+labels = ['Cat', 'Dog', 'Snake']
 
-# 4. Then load the weights
-model.load_weights("model/model_vgg16_gap2d.weights.h5")
-# === Classes (adjust to your actual order) ===
-CLASS_NAMES = ['Cat', 'Dog', 'Snake']
+@app.route('/')
+def home():
+    return render_template('index.html')
 
-def prepare_image(img):
-    img = img.resize((224, 224))
-    img_array = img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    return preprocess_input(img_array)
+@app.route('/predict', methods=['POST'])
+def predict():
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image uploaded'}), 400
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    prediction = None
-    if request.method == 'POST':
-        file = request.files['image']
-        if file:
-            image = Image.open(file.stream).convert('RGB')
-            processed = prepare_image(image)
-            preds = model.predict(processed)
-            predicted_class = CLASS_NAMES[np.argmax(preds)]
-            prediction = f"Prediction: {predicted_class}"
-    return render_template('index.html', prediction=prediction)
+    img = request.files['image']
+    filepath = os.path.join(UPLOAD_FOLDER, img.filename)
+    img.save(filepath)
+
+    image = load_img(filepath, target_size=IMG_SIZE)
+    image = img_to_array(image)
+    image = np.expand_dims(image, axis=0)
+    image = image / 255.0
+
+    predictions = model.predict(image)
+    predicted_class = labels[np.argmax(predictions)]
+
+    return jsonify({'prediction': predicted_class, 'image_url': filepath})
 
 if __name__ == '__main__':
     app.run(debug=True)
